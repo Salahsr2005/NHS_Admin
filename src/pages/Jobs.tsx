@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Job, JobStatus, JobType } from '@/types/database';
+import { Job, JobStatus, JobType, JobWithStats } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { EmptyState } from '@/components/common/EmptyState';
 import { TableSkeleton } from '@/components/common/Skeleton';
-import { Plus, Pencil, Trash2, Briefcase, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Briefcase, Loader2, Users, Calendar, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const jobTypes: { value: JobType; label: string }[] = [
@@ -73,32 +73,16 @@ export default function Jobs() {
     salary_range: '',
     status: 'open' as JobStatus,
     deadline: '',
+    image_url: '',
+    max_applicants: '',
   });
 
   const { data: jobs, isLoading } = useQuery({
-    queryKey: ['jobs'],
+    queryKey: ['jobs-with-counts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.rpc('get_all_jobs_with_counts');
       if (error) throw error;
-      return data as Job[];
-    },
-  });
-
-  const { data: applicationCounts } = useQuery({
-    queryKey: ['job-application-counts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('applications')
-        .select('job_id');
-      if (error) throw error;
-      const counts: Record<string, number> = {};
-      data?.forEach((app) => {
-        counts[app.job_id] = (counts[app.job_id] || 0) + 1;
-      });
-      return counts;
+      return data as JobWithStats[];
     },
   });
 
@@ -112,11 +96,14 @@ export default function Jobs() {
         salary_range: data.salary_range || null,
         status: data.status,
         deadline: data.deadline || null,
+        image_url: data.image_url || null,
+        max_applicants: data.max_applicants ? parseInt(data.max_applicants) : null,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({ title: 'Job Created', description: 'The job has been created successfully.' });
       closeSheet();
     },
@@ -135,11 +122,14 @@ export default function Jobs() {
         salary_range: data.salary_range || null,
         status: data.status,
         deadline: data.deadline || null,
+        image_url: data.image_url || null,
+        max_applicants: data.max_applicants ? parseInt(data.max_applicants) : null,
       }).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({ title: 'Job Updated', description: 'The job has been updated successfully.' });
       closeSheet();
     },
@@ -154,7 +144,8 @@ export default function Jobs() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({ title: 'Job Deleted', description: 'The job has been deleted successfully.' });
       setDeleteId(null);
     },
@@ -173,20 +164,24 @@ export default function Jobs() {
       salary_range: '',
       status: 'open',
       deadline: '',
+      image_url: '',
+      max_applicants: '',
     });
     setIsSheetOpen(true);
   };
 
-  const openEditSheet = (job: Job) => {
-    setEditingJob(job);
+  const openEditSheet = (job: JobWithStats) => {
+    setEditingJob(job as Job);
     setFormData({
       title: job.title,
       description: job.description || '',
       location: job.location,
-      job_type: job.job_type,
+      job_type: job.job_type as JobType,
       salary_range: job.salary_range || '',
-      status: job.status,
+      status: job.status as JobStatus,
       deadline: job.deadline || '',
+      image_url: job.image_url || '',
+      max_applicants: job.max_applicants?.toString() || '',
     });
     setIsSheetOpen(true);
   };
@@ -211,6 +206,27 @@ export default function Jobs() {
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
+  const getStatusBadge = (status: string, isDeadlinePassed?: boolean) => {
+    if (isDeadlinePassed && status === 'open') {
+      return (
+        <Badge className="bg-warning/10 text-warning border border-warning/20">
+          <AlertTriangle className="mr-1 h-3 w-3" />
+          Deadline Passed
+        </Badge>
+      );
+    }
+    const variants: Record<string, string> = {
+      open: 'bg-success/10 text-success border-success/20',
+      closed: 'bg-destructive/10 text-destructive border-destructive/20',
+      on_hold: 'bg-warning/10 text-warning border-warning/20',
+    };
+    return (
+      <Badge className={`${variants[status] || 'bg-secondary'} border capitalize`}>
+        {status.replace('_', ' ')}
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -229,7 +245,7 @@ export default function Jobs() {
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
           <div className="p-6">
-            <TableSkeleton rows={5} columns={5} />
+            <TableSkeleton rows={5} columns={6} />
           </div>
         ) : !jobs || jobs.length === 0 ? (
           <EmptyState
@@ -244,9 +260,10 @@ export default function Jobs() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
+                  <TableHead>Job</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Deadline</TableHead>
                   <TableHead className="text-center">Applicants</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -255,16 +272,45 @@ export default function Jobs() {
               <TableBody>
                 {jobs.map((job) => (
                   <TableRow key={job.id}>
-                    <TableCell className="font-medium">{job.title}</TableCell>
-                    <TableCell className="text-muted-foreground">{job.location}</TableCell>
-                    <TableCell className="text-muted-foreground capitalize">
-                      {job.job_type.replace('_', ' ')}
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-foreground">{job.title}</p>
+                        {job.salary_range && (
+                          <p className="text-xs text-muted-foreground">{job.salary_range}</p>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell className="text-center">
-                      {applicationCounts?.[job.id] || 0}
+                    <TableCell className="text-muted-foreground">{job.location}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {job.job_type.replace('_', ' ')}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={job.status}>{job.status.replace('_', ' ')}</Badge>
+                      {job.deadline ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className={job.is_deadline_passed ? 'text-destructive' : 'text-muted-foreground'}>
+                            {format(new Date(job.deadline), 'MMM d, yyyy')}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-medium">
+                          {job.total_applications}
+                          {job.max_applicants && (
+                            <span className="text-muted-foreground">/{job.max_applicants}</span>
+                          )}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(job.status, job.is_deadline_passed)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -368,13 +414,35 @@ export default function Jobs() {
                 placeholder="e.g. $80,000 - $120,000"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="deadline">Deadline</Label>
+                <Input
+                  id="deadline"
+                  type="date"
+                  value={formData.deadline}
+                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max_applicants">Max Applicants</Label>
+                <Input
+                  id="max_applicants"
+                  type="number"
+                  min="1"
+                  value={formData.max_applicants}
+                  onChange={(e) => setFormData({ ...formData, max_applicants: e.target.value })}
+                  placeholder="Unlimited"
+                />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="deadline">Deadline</Label>
+              <Label htmlFor="image_url">Image URL</Label>
               <Input
-                id="deadline"
-                type="date"
-                value={formData.deadline}
-                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                id="image_url"
+                value={formData.image_url}
+                onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                placeholder="https://example.com/image.jpg"
               />
             </div>
             <div className="flex gap-3 pt-4">

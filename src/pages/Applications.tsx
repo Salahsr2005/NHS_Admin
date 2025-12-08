@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ApplicationStatus } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -11,10 +12,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { EmptyState } from '@/components/common/EmptyState';
 import { CardSkeleton } from '@/components/common/Skeleton';
-import { FileText, Download, CheckCircle, XCircle } from 'lucide-react';
+import { FileText, Download, CheckCircle, XCircle, Clock, Eye, Mail, Phone, MapPin, Star, Briefcase, GraduationCap } from 'lucide-react';
 import { format } from 'date-fns';
 
 const statusTabs: { value: ApplicationStatus | 'all'; label: string }[] = [
@@ -25,6 +33,8 @@ const statusTabs: { value: ApplicationStatus | 'all'; label: string }[] = [
   { value: 'rejected', label: 'Rejected' },
   { value: 'accepted', label: 'Accepted' },
 ];
+
+const statusOptions: ApplicationStatus[] = ['pending', 'reviewing', 'shortlisted', 'rejected', 'accepted'];
 
 export default function Applications() {
   const queryClient = useQueryClient();
@@ -39,8 +49,8 @@ export default function Applications() {
         .from('applications')
         .select(`
           *,
-          job:jobs(id, title),
-          applicant:applicants(id, full_name, email)
+          job:jobs(id, title, location),
+          applicant:applicants(id, full_name, email, phone, gender, wilaya, age, avatar_url, rating, skills, education, experience)
         `)
         .order('applied_at', { ascending: false });
       if (error) throw error;
@@ -50,14 +60,17 @@ export default function Applications() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: ApplicationStatus }) => {
-      const { error } = await supabase
-        .from('applications')
-        .update({ status })
-        .eq('id', id);
+      const { data, error } = await supabase.rpc('update_application_status', {
+        application_id_param: id,
+        new_status: status,
+      });
       if (error) throw error;
+      return data;
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-applications'] });
       toast({
         title: 'Status Updated',
         description: `Application marked as ${status}.`,
@@ -74,6 +87,44 @@ export default function Applications() {
 
   const handleStatusUpdate = (id: string, status: ApplicationStatus) => {
     updateStatusMutation.mutate({ id, status });
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, string> = {
+      pending: 'bg-warning/10 text-warning border-warning/20',
+      reviewing: 'bg-primary/10 text-primary border-primary/20',
+      shortlisted: 'bg-success/10 text-success border-success/20',
+      accepted: 'bg-success/10 text-success border-success/20',
+      rejected: 'bg-destructive/10 text-destructive border-destructive/20',
+    };
+    return variants[status] || 'bg-secondary text-foreground';
+  };
+
+  const parseSkills = (skills: any): string[] => {
+    if (!skills) return [];
+    if (Array.isArray(skills)) return skills;
+    if (typeof skills === 'string') {
+      try {
+        return JSON.parse(skills);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const renderRating = (rating: number | null) => {
+    if (!rating) return null;
+    return (
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star
+            key={i}
+            className={`h-3 w-3 ${i < rating ? 'fill-warning text-warning' : 'text-muted-foreground/30'}`}
+          />
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -123,7 +174,13 @@ export default function Applications() {
                   key={app.id}
                   className="rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={app.applicant?.avatar_url || undefined} />
+                      <AvatarFallback className="bg-secondary text-sm font-medium">
+                        {app.applicant?.full_name?.slice(0, 2).toUpperCase() || '??'}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">
                         {app.applicant?.full_name || 'Unknown'}
@@ -131,15 +188,21 @@ export default function Applications() {
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {app.job?.title || 'Unknown Position'}
                       </p>
+                      {app.applicant?.rating && (
+                        <div className="mt-1">
+                          {renderRating(app.applicant.rating)}
+                        </div>
+                      )}
                     </div>
-                    <Badge variant={app.status as ApplicationStatus} className="ml-2 shrink-0">
+                    <Badge className={`${getStatusBadge(app.status)} border shrink-0 capitalize`}>
                       {app.status}
                     </Badge>
                   </div>
 
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Applied {format(new Date(app.applied_at), 'MMM d, yyyy')}
-                  </p>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>Applied {format(new Date(app.applied_at), 'MMM d, yyyy')}</span>
+                  </div>
 
                   <div className="mt-4 flex gap-2">
                     <Button
@@ -170,6 +233,7 @@ export default function Applications() {
                     className="mt-2 w-full text-muted-foreground"
                     onClick={() => setSelectedApplication(app)}
                   >
+                    <Eye className="mr-1.5 h-3.5 w-3.5" />
                     View Details
                   </Button>
                 </div>
@@ -181,37 +245,138 @@ export default function Applications() {
 
       {/* Application Detail Modal */}
       <Dialog open={!!selectedApplication} onOpenChange={() => setSelectedApplication(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Application Details</DialogTitle>
           </DialogHeader>
           {selectedApplication && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Applicant</p>
-                  <p className="text-sm text-foreground">{selectedApplication.applicant?.full_name}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Email</p>
-                  <p className="text-sm text-foreground">{selectedApplication.applicant?.email}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Position</p>
-                  <p className="text-sm text-foreground">{selectedApplication.job?.title}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Status</p>
-                  <Badge variant={selectedApplication.status} className="mt-1">
-                    {selectedApplication.status}
-                  </Badge>
+            <div className="space-y-6">
+              {/* Applicant Header */}
+              <div className="flex items-start gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={selectedApplication.applicant?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-secondary text-lg font-medium">
+                    {selectedApplication.applicant?.full_name?.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {selectedApplication.applicant?.full_name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Applied for {selectedApplication.job?.title}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedApplication.applicant?.gender && (
+                      <Badge variant="outline" className="capitalize">
+                        {selectedApplication.applicant.gender}
+                      </Badge>
+                    )}
+                    {selectedApplication.applicant?.age && (
+                      <Badge variant="outline">{selectedApplication.applicant.age} yrs</Badge>
+                    )}
+                    {selectedApplication.applicant?.rating && (
+                      <div className="flex items-center gap-1">
+                        {renderRating(selectedApplication.applicant.rating)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
+              {/* Status Update */}
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-foreground">Status:</span>
+                <Select
+                  value={selectedApplication.status}
+                  onValueChange={(value) => handleStatusUpdate(selectedApplication.id, value as ApplicationStatus)}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status} className="capitalize">
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Contact Info */}
+              <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-secondary/30 p-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{selectedApplication.applicant?.email}</span>
+                </div>
+                {selectedApplication.applicant?.phone && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedApplication.applicant.phone}</span>
+                  </div>
+                )}
+                {selectedApplication.applicant?.wilaya && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedApplication.applicant.wilaya}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Skills */}
+              {parseSkills(selectedApplication.applicant?.skills).length > 0 && (
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-foreground">Skills</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {parseSkills(selectedApplication.applicant?.skills).map((skill) => (
+                      <Badge key={skill} variant="secondary">{skill}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Education */}
+              {selectedApplication.applicant?.education?.length > 0 && (
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-foreground flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Education
+                  </h4>
+                  <div className="space-y-2">
+                    {selectedApplication.applicant.education.map((edu: any, i: number) => (
+                      <div key={i} className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="font-medium text-foreground">{edu.degree}</p>
+                        <p className="text-sm text-muted-foreground">{edu.school} • {edu.year}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Experience */}
+              {selectedApplication.applicant?.experience?.length > 0 && (
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-foreground flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" />
+                    Experience
+                  </h4>
+                  <div className="space-y-2">
+                    {selectedApplication.applicant.experience.map((exp: any, i: number) => (
+                      <div key={i} className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="font-medium text-foreground">{exp.title}</p>
+                        <p className="text-sm text-muted-foreground">{exp.company} • {exp.duration}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cover Letter */}
               {selectedApplication.cover_letter && (
                 <div>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">Cover Letter</p>
-                  <div className="rounded-lg border border-border bg-secondary/50 p-3">
+                  <h4 className="mb-2 text-sm font-medium text-foreground">Cover Letter</h4>
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
                     <p className="whitespace-pre-wrap text-sm text-foreground">
                       {selectedApplication.cover_letter}
                     </p>
@@ -219,6 +384,7 @@ export default function Applications() {
                 </div>
               )}
 
+              {/* CV Download */}
               {selectedApplication.cv_url && (
                 <Button asChild variant="outline" className="w-full">
                   <a href={selectedApplication.cv_url} target="_blank" rel="noopener noreferrer">
