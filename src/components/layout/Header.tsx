@@ -1,6 +1,8 @@
 import { useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +23,7 @@ const routeNames: Record<string, string> = {
 export function Header() {
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useUserRole();
 
   const currentRoute = routeNames[location.pathname] || 'Dashboard';
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || 'AD';
@@ -34,27 +37,32 @@ export function Header() {
         <span className="font-medium text-foreground">{currentRoute}</span>
       </nav>
 
-      {/* User Menu */}
-      <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary">
-          <span className="hidden text-sm font-medium text-foreground sm:block">
-            {user?.email}
-          </span>
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-foreground text-xs text-background">
-              {userInitials}
-            </AvatarFallback>
-          </Avatar>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <div className="px-2 py-1.5">
-            <p className="text-sm font-medium">{user?.email}</p>
-            <p className="text-xs text-muted-foreground">Administrator</p>
-          </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={signOut}>Sign out</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-4">
+        {/* Create User - Only visible to admins */}
+        {isAdmin && <CreateUserDialog />}
+
+        {/* User Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary">
+            <span className="hidden text-sm font-medium text-foreground sm:block">
+              {user?.email}
+            </span>
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-foreground text-xs text-background">
+                {userInitials}
+              </AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <div className="px-2 py-1.5">
+              <p className="text-sm font-medium">{user?.email}</p>
+              <p className="text-xs text-muted-foreground">{isAdmin ? 'Administrator' : 'User'}</p>
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={signOut}>Sign out</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }
