@@ -16,32 +16,53 @@ export type Database = {
     Tables: {
       applicants: {
         Row: {
+          address: string | null
+          age: number | null
+          avatar_url: string | null
           created_at: string
+          education: Json | null
           email: string
+          experience: Json | null
           full_name: string
+          gender: string | null
           id: string
           phone: string | null
-          skills: string[] | null
+          rating: number | null
+          skills: Json | null
           updated_at: string
           wilaya: string | null
         }
         Insert: {
+          address?: string | null
+          age?: number | null
+          avatar_url?: string | null
           created_at?: string
+          education?: Json | null
           email: string
+          experience?: Json | null
           full_name: string
+          gender?: string | null
           id?: string
           phone?: string | null
-          skills?: string[] | null
+          rating?: number | null
+          skills?: Json | null
           updated_at?: string
           wilaya?: string | null
         }
         Update: {
+          address?: string | null
+          age?: number | null
+          avatar_url?: string | null
           created_at?: string
+          education?: Json | null
           email?: string
+          experience?: Json | null
           full_name?: string
+          gender?: string | null
           id?: string
           phone?: string | null
-          skills?: string[] | null
+          rating?: number | null
+          skills?: Json | null
           updated_at?: string
           wilaya?: string | null
         }
@@ -101,8 +122,10 @@ export type Database = {
           deadline: string | null
           description: string | null
           id: string
+          image_url: string | null
           job_type: Database["public"]["Enums"]["job_type"]
           location: string
+          max_applicants: number | null
           salary_range: string | null
           status: Database["public"]["Enums"]["job_status"]
           title: string
@@ -113,8 +136,10 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location: string
+          max_applicants?: number | null
           salary_range?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           title: string
@@ -125,8 +150,10 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location?: string
+          max_applicants?: number | null
           salary_range?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           title?: string
@@ -187,12 +214,155 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bulk_update_application_status: {
+        Args: { application_ids: string[]; new_status: string }
+        Returns: {
+          message: string
+          success: boolean
+          updated_count: number
+        }[]
+      }
+      get_all_jobs_with_counts: {
+        Args: never
+        Returns: {
+          created_at: string
+          deadline: string
+          description: string
+          id: string
+          image_url: string
+          is_deadline_passed: boolean
+          job_type: string
+          location: string
+          max_applicants: number
+          salary_range: string
+          status: string
+          title: string
+          total_applications: number
+        }[]
+      }
+      get_applicants_for_job: {
+        Args: { job_id_param: string }
+        Returns: {
+          age: number
+          applicant_id: string
+          application_id: string
+          application_status: string
+          applied_at: string
+          avatar_url: string
+          cover_letter: string
+          cv_url: string
+          education: Json
+          email: string
+          experience: Json
+          full_name: string
+          gender: string
+          phone: string
+          rating: number
+          skills: Json
+          wilaya: string
+        }[]
+      }
+      get_dashboard_stats: {
+        Args: never
+        Returns: {
+          accepted_applications: number
+          applications_this_month: number
+          applications_this_week: number
+          applications_today: number
+          closed_jobs: number
+          open_jobs: number
+          pending_applications: number
+          rejected_applications: number
+          reviewing_applications: number
+          shortlisted_applications: number
+          total_applicants: number
+          total_applications: number
+          total_jobs: number
+        }[]
+      }
+      get_job_demographics: {
+        Args: { job_id_param: string }
+        Returns: {
+          avg_age: number
+          female_count: number
+          male_count: number
+          top_wilaya: string
+          total_applicants: number
+          wilaya_distribution: Json
+        }[]
+      }
+      get_job_with_stats: {
+        Args: { job_id_param: string }
+        Returns: {
+          accepted_count: number
+          created_at: string
+          deadline: string
+          description: string
+          id: string
+          image_url: string
+          job_type: string
+          location: string
+          max_applicants: number
+          pending_count: number
+          rejected_count: number
+          reviewing_count: number
+          salary_range: string
+          shortlisted_count: number
+          status: string
+          title: string
+          total_applications: number
+        }[]
+      }
+      get_recent_applications: {
+        Args: { limit_count?: number }
+        Returns: {
+          applicant_avatar_url: string
+          applicant_email: string
+          applicant_id: string
+          applicant_name: string
+          application_id: string
+          applied_at: string
+          job_id: string
+          job_title: string
+          status: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      search_applicants_filtered: {
+        Args: {
+          filter_gender?: string
+          filter_wilaya?: string
+          max_age?: number
+          min_age?: number
+          min_rating?: number
+          search_term?: string
+        }
+        Returns: {
+          age: number
+          avatar_url: string
+          email: string
+          full_name: string
+          gender: string
+          id: string
+          phone: string
+          rating: number
+          skills: Json
+          total_applications: number
+          wilaya: string
+        }[]
+      }
+      update_application_status: {
+        Args: { application_id_param: string; new_status: string }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
       }
     }
     Enums: {
