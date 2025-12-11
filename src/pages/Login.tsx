@@ -14,9 +14,8 @@ const authSchema = z.object({
 });
 
 export default function Login() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn } = useAuth();
   const { toast } = useToast();
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,22 +48,14 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const { error } = isSignUp 
-        ? await signUp(email, password)
-        : await signIn(email, password);
+      const { error } = await signIn(email, password);
 
       if (error) {
         toast({
-          title: isSignUp ? 'Sign Up Failed' : 'Sign In Failed',
+          title: 'Sign In Failed',
           description: error.message,
           variant: 'destructive',
         });
-      } else if (isSignUp) {
-        toast({
-          title: 'Account Created',
-          description: 'You can now sign in with your credentials.',
-        });
-        setIsSignUp(false);
       }
     } finally {
       setIsSubmitting(false);
@@ -82,7 +73,7 @@ export default function Login() {
             </div>
             <h1 className="text-xl font-semibold text-foreground">Recruit Admin</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isSignUp ? 'Create your account' : 'Sign in to your account'}
+              Sign in to your account
             </p>
           </div>
 
@@ -125,27 +116,16 @@ export default function Login() {
             >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isSignUp ? (
-                'Create Account'
               ) : (
                 'Sign In'
               )}
             </Button>
           </form>
 
-          {/* Toggle */}
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">
-              {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-            </span>{' '}
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="font-medium text-foreground hover:underline"
-            >
-              {isSignUp ? 'Sign in' : 'Sign up'}
-            </button>
-          </div>
+          {/* Info */}
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Contact your administrator to get access
+          </p>
         </div>
       </div>
     </div>

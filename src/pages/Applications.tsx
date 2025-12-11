@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ApplicationStatus } from '@/types/database';
@@ -22,8 +22,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { EmptyState } from '@/components/common/EmptyState';
 import { CardSkeleton } from '@/components/common/Skeleton';
-import { FileText, Download, CheckCircle, XCircle, Clock, Eye, Mail, Phone, MapPin, Star, Briefcase, GraduationCap } from 'lucide-react';
+import { ApplicationFilters, ApplicationFiltersState } from '@/components/applications/ApplicationFilters';
+import { ApplicationCard } from '@/components/applications/ApplicationCard';
+import { ApplicantCompareModal } from '@/components/applications/ApplicantCompareModal';
+import { getRandomAvatar } from '@/components/applicants/ApplicantCard';
+import { FileText, Download, Mail, Phone, MapPin, Star, Briefcase, GraduationCap, GitCompare, LayoutGrid, List, Users } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const statusTabs: { value: ApplicationStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -41,6 +46,20 @@ export default function Applications() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<ApplicationStatus | 'all'>('all');
   const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [filters, setFilters] = useState<ApplicationFiltersState>({
+    search: '',
+    jobId: null,
+    gender: null,
+    wilaya: null,
+    minRating: 0,
+    maxAge: null,
+    minAge: null,
+    dateFrom: null,
+    dateTo: null,
+  });
 
   const { data: applications, isLoading } = useQuery({
     queryKey: ['applications'],
@@ -55,6 +74,18 @@ export default function Applications() {
         .order('applied_at', { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: jobs } = useQuery({
+    queryKey: ['jobs-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, title')
+        .order('title');
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -81,24 +112,81 @@ export default function Applications() {
     },
   });
 
-  const filteredApplications = applications?.filter((app) =>
-    activeTab === 'all' ? true : app.status === activeTab
-  );
+  // Get unique wilayas for filter
+  const wilayas = useMemo(() => {
+    if (!applications) return [];
+    const uniqueWilayas = new Set<string>();
+    applications.forEach((app) => {
+      if (app.applicant?.wilaya) {
+        uniqueWilayas.add(app.applicant.wilaya);
+      }
+    });
+    return Array.from(uniqueWilayas).sort();
+  }, [applications]);
+
+  // Filter applications
+  const filteredApplications = useMemo(() => {
+    if (!applications) return [];
+
+    return applications.filter((app) => {
+      // Status filter
+      if (activeTab !== 'all' && app.status !== activeTab) return false;
+
+      // Search filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesName = app.applicant?.full_name?.toLowerCase().includes(searchLower);
+        const matchesEmail = app.applicant?.email?.toLowerCase().includes(searchLower);
+        const matchesJob = app.job?.title?.toLowerCase().includes(searchLower);
+        if (!matchesName && !matchesEmail && !matchesJob) return false;
+      }
+
+      // Job filter
+      if (filters.jobId && app.job?.id !== filters.jobId) return false;
+
+      // Gender filter
+      if (filters.gender && app.applicant?.gender !== filters.gender) return false;
+
+      // Wilaya filter
+      if (filters.wilaya && app.applicant?.wilaya !== filters.wilaya) return false;
+
+      // Rating filter
+      if (filters.minRating > 0 && (!app.applicant?.rating || app.applicant.rating < filters.minRating)) return false;
+
+      // Age filters
+      if (filters.minAge && (!app.applicant?.age || app.applicant.age < filters.minAge)) return false;
+      if (filters.maxAge && (!app.applicant?.age || app.applicant.age > filters.maxAge)) return false;
+
+      // Date filters
+      if (filters.dateFrom && new Date(app.applied_at) < new Date(filters.dateFrom)) return false;
+      if (filters.dateTo && new Date(app.applied_at) > new Date(filters.dateTo)) return false;
+
+      return true;
+    });
+  }, [applications, activeTab, filters]);
 
   const handleStatusUpdate = (id: string, status: ApplicationStatus) => {
     updateStatusMutation.mutate({ id, status });
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      pending: 'bg-warning/10 text-warning border-warning/20',
-      reviewing: 'bg-primary/10 text-primary border-primary/20',
-      shortlisted: 'bg-success/10 text-success border-success/20',
-      accepted: 'bg-success/10 text-success border-success/20',
-      rejected: 'bg-destructive/10 text-destructive border-destructive/20',
-    };
-    return variants[status] || 'bg-secondary text-foreground';
+  const toggleCompareSelection = (id: string, checked: boolean) => {
+    if (checked && selectedForCompare.length < 4) {
+      setSelectedForCompare([...selectedForCompare, id]);
+    } else if (!checked) {
+      setSelectedForCompare(selectedForCompare.filter((s) => s !== id));
+    } else {
+      toast({
+        title: 'Maximum reached',
+        description: 'You can compare up to 4 applicants at a time.',
+        variant: 'destructive',
+      });
+    }
   };
+
+  const compareApplications = useMemo(() => {
+    if (!applications) return [];
+    return applications.filter((app) => selectedForCompare.includes(app.id));
+  }, [applications, selectedForCompare]);
 
   const parseSkills = (skills: any): string[] => {
     if (!skills) return [];
@@ -120,7 +208,7 @@ export default function Applications() {
         {Array.from({ length: 5 }).map((_, i) => (
           <Star
             key={i}
-            className={`h-3 w-3 ${i < rating ? 'fill-warning text-warning' : 'text-muted-foreground/30'}`}
+            className={`h-3 w-3 ${i < rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`}
           />
         ))}
       </div>
@@ -129,24 +217,97 @@ export default function Applications() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Applications</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Review and manage job applications
-        </p>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Applications</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review and manage job applications
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Compare Button */}
+          {selectedForCompare.length >= 2 && (
+            <Button
+              onClick={() => setShowCompareModal(true)}
+              className="gap-2 bg-gradient-to-r from-primary to-primary/80"
+            >
+              <GitCompare className="h-4 w-4" />
+              Compare ({selectedForCompare.length})
+            </Button>
+          )}
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center rounded-lg border border-border/50 bg-secondary/30 p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 px-3",
+                viewMode === 'grid' && "bg-background shadow-sm"
+              )}
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 px-3",
+                viewMode === 'list' && "bg-background shadow-sm"
+              )}
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
+      {/* Filters */}
+      <ApplicationFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        jobs={jobs || []}
+        wilayas={wilayas}
+      />
+
+      {/* Selection Info */}
+      {selectedForCompare.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-3">
+          <span className="text-sm text-foreground">
+            <Users className="inline h-4 w-4 mr-2" />
+            {selectedForCompare.length} applicant{selectedForCompare.length > 1 ? 's' : ''} selected for comparison
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedForCompare([])}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Clear selection
+          </Button>
+        </div>
+      )}
+
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ApplicationStatus | 'all')}>
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <TabsList className="w-full justify-start overflow-x-auto bg-secondary/30 p-1">
           {statusTabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="capitalize">
+            <TabsTrigger 
+              key={tab.value} 
+              value={tab.value} 
+              className="capitalize data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               {tab.label}
               {applications && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  ({tab.value === 'all'
+                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs bg-muted">
+                  {tab.value === 'all'
                     ? applications.length
-                    : applications.filter((a) => a.status === tab.value).length})
-                </span>
+                    : applications.filter((a) => a.status === tab.value).length}
+                </Badge>
               )}
             </TabsTrigger>
           ))}
@@ -154,8 +315,11 @@ export default function Applications() {
 
         <TabsContent value={activeTab} className="mt-6">
           {isLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className={cn(
+              "grid gap-4",
+              viewMode === 'grid' ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
+            )}>
+              {Array.from({ length: 8 }).map((_, i) => (
                 <CardSkeleton key={i} />
               ))}
             </div>
@@ -163,85 +327,42 @@ export default function Applications() {
             <EmptyState
               icon={FileText}
               title="No applications found"
-              description={activeTab === 'all' 
-                ? "No applications have been submitted yet."
-                : `No ${activeTab} applications.`}
+              description={
+                filters.search || filters.jobId || filters.gender
+                  ? "Try adjusting your filters."
+                  : activeTab === 'all' 
+                    ? "No applications have been submitted yet."
+                    : `No ${activeTab} applications.`
+              }
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className={cn(
+              "grid gap-4",
+              viewMode === 'grid' ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
+            )}>
               {filteredApplications.map((app) => (
-                <div
+                <ApplicationCard
                   key={app.id}
-                  className="rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm"
-                >
-                  <div className="flex items-start gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={app.applicant?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-secondary text-sm font-medium">
-                        {app.applicant?.full_name?.slice(0, 2).toUpperCase() || '??'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {app.applicant?.full_name || 'Unknown'}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {app.job?.title || 'Unknown Position'}
-                      </p>
-                      {app.applicant?.rating && (
-                        <div className="mt-1">
-                          {renderRating(app.applicant.rating)}
-                        </div>
-                      )}
-                    </div>
-                    <Badge className={`${getStatusBadge(app.status)} border shrink-0 capitalize`}>
-                      {app.status}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>Applied {format(new Date(app.applied_at), 'MMM d, yyyy')}</span>
-                  </div>
-
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10"
-                      onClick={() => handleStatusUpdate(app.id, 'rejected')}
-                      disabled={app.status === 'rejected' || updateStatusMutation.isPending}
-                    >
-                      <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                      Reject
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-success/30 text-success hover:bg-success/10"
-                      onClick={() => handleStatusUpdate(app.id, 'shortlisted')}
-                      disabled={app.status === 'shortlisted' || updateStatusMutation.isPending}
-                    >
-                      <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-                      Shortlist
-                    </Button>
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 w-full text-muted-foreground"
-                    onClick={() => setSelectedApplication(app)}
-                  >
-                    <Eye className="mr-1.5 h-3.5 w-3.5" />
-                    View Details
-                  </Button>
-                </div>
+                  application={app}
+                  isSelected={selectedForCompare.includes(app.id)}
+                  onSelect={(checked) => toggleCompareSelection(app.id, checked)}
+                  onView={() => setSelectedApplication(app)}
+                  onStatusChange={(status) => handleStatusUpdate(app.id, status as ApplicationStatus)}
+                  isUpdating={updateStatusMutation.isPending}
+                />
               ))}
             </div>
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Compare Modal */}
+      <ApplicantCompareModal
+        open={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
+        applications={compareApplications}
+        onRemove={(id) => setSelectedForCompare(selectedForCompare.filter((s) => s !== id))}
+      />
 
       {/* Application Detail Modal */}
       <Dialog open={!!selectedApplication} onOpenChange={() => setSelectedApplication(null)}>
@@ -253,9 +374,12 @@ export default function Applications() {
             <div className="space-y-6">
               {/* Applicant Header */}
               <div className="flex items-start gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={selectedApplication.applicant?.avatar_url || undefined} />
-                  <AvatarFallback className="bg-secondary text-lg font-medium">
+                <Avatar className="h-16 w-16 ring-2 ring-background shadow-lg">
+                  <AvatarImage 
+                    src={selectedApplication.applicant?.avatar_url || 
+                      getRandomAvatar(selectedApplication.applicant?.gender, selectedApplication.applicant?.id)} 
+                  />
+                  <AvatarFallback className="bg-gradient-to-br from-primary/20 to-secondary text-lg font-medium">
                     {selectedApplication.applicant?.full_name?.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -386,11 +510,13 @@ export default function Applications() {
 
               {/* CV Download */}
               {selectedApplication.cv_url && (
-                <Button asChild variant="outline" className="w-full">
-                  <a href={selectedApplication.cv_url} target="_blank" rel="noopener noreferrer">
-                    <Download className="mr-2 h-4 w-4" />
-                    Download CV
-                  </a>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => window.open(selectedApplication.cv_url, '_blank', 'noopener,noreferrer')}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  View CV
                 </Button>
               )}
             </div>

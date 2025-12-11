@@ -33,7 +33,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
           <Briefcase className="h-4 w-4 text-background" />
         </div>
-        <span className="text-lg font-semibold text-foreground">Recruit</span>
+        <span className="text-lg font-semibold text-foreground">Numidia HR Admin</span>
       </div>
 
       {/* Navigation */}

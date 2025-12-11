@@ -15,14 +15,19 @@ export function useUserRole() {
         return;
       }
 
-      const { data, error } = await supabase.rpc('has_role', {
-        _user_id: user.id,
-        _role: 'admin'
-      });
+      try {
+        const { data, error } = await supabase.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
 
-      if (!error && data) {
-        setIsAdmin(true);
-      } else {
+        if (!error && data === true) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (err) {
+        console.error('Error checking role:', err);
         setIsAdmin(false);
       }
       setLoading(false);

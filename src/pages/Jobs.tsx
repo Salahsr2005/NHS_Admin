@@ -282,9 +282,7 @@ export default function Jobs() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{job.location}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {job.job_type.replace('_', ' ')}
-                      </Badge>
+                      
                     </TableCell>
                     <TableCell>
                       {job.deadline ? (
