@@ -1,12 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Star, Clock, Eye, CheckCircle, XCircle, FileText, MapPin, Sparkles } from 'lucide-react';
+import { Star, Clock, Eye, CheckCircle, XCircle, FileText, MapPin, ClipboardList } from 'lucide-react';
 import { getRandomAvatar } from '@/components/applicants/ApplicantCard';
-import { cn } from '@/lib/utils';
+import { cn, getPersonDisplayName, getPersonInitials } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface ApplicationCardProps {
@@ -18,7 +19,8 @@ interface ApplicationCardProps {
     job: { id: string; title: string; location: string } | null;
     applicant: {
       id: string;
-      full_name: string;
+      first_name: string;
+      last_name: string;
       email: string;
       phone: string | null;
       gender: string | null;
@@ -44,6 +46,7 @@ export function ApplicationCard({
   onStatusChange,
   isUpdating,
 }: ApplicationCardProps) {
+  const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
 
   const getStatusStyles = (status: string) => {
@@ -117,13 +120,13 @@ export function ApplicationCard({
           )}>
             <AvatarImage src={avatarUrl} className="object-cover" />
             <AvatarFallback className="bg-gradient-to-br from-primary/20 to-secondary text-lg font-bold">
-              {application.applicant?.full_name?.slice(0, 2).toUpperCase()}
+              {getPersonInitials(application.applicant)}
             </AvatarFallback>
           </Avatar>
 
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground text-base truncate">
-              {application.applicant?.full_name || 'Unknown'}
+              {getPersonDisplayName(application.applicant)}
             </h3>
             <p className="text-sm text-primary font-medium truncate mt-0.5">
               {application.job?.title || 'Unknown Position'}
@@ -210,13 +213,22 @@ export function ApplicationCard({
             onClick={onView}
           >
             <Eye className="h-3.5 w-3.5 mr-1" />
-            View Details
+            Quick View
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1 text-xs bg-primary/10 hover:bg-primary/20 text-primary"
+            onClick={() => navigate(`/applications/${application.id}`)}
+          >
+            <ClipboardList className="h-3.5 w-3.5 mr-1" />
+            Timeline
           </Button>
           {application.cv_url && (
             <Button
               variant="secondary"
               size="sm"
-              className="text-xs bg-primary/10 hover:bg-primary/20 text-primary"
+              className="text-xs bg-secondary hover:bg-secondary/80"
               onClick={openCV}
             >
               <FileText className="h-3.5 w-3.5" />

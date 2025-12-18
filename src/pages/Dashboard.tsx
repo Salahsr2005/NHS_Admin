@@ -10,6 +10,7 @@ import { ApplicationsChart } from '@/components/dashboard/ApplicationsChart';
 import { StatusPieChart } from '@/components/dashboard/StatusPieChart';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { useUserRole } from '@/hooks/useUserRole';
+import { getPersonDisplayName } from '@/lib/utils';
 
 export default function Dashboard() {
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -26,9 +27,31 @@ export default function Dashboard() {
   const { data: recentApplications, isLoading: recentLoading } = useQuery({
     queryKey: ['recent-applications'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_recent_applications', { limit_count: 5 });
+      const { data, error } = await supabase
+        .from('applications')
+        .select(`
+          id,
+          status,
+          applied_at,
+          jobs (id, title),
+          applicants (*)
+        `)
+        .order('applied_at', { ascending: false })
+        .limit(5);
+
       if (error) throw error;
-      return data as RecentApplication[];
+
+      return (data || []).map((row: any) => ({
+        application_id: row.id,
+        job_id: row.jobs?.id,
+        job_title: row.jobs?.title,
+        applicant_id: row.applicants?.id,
+        applicant_name: getPersonDisplayName(row.applicants),
+        applicant_email: row.applicants?.email,
+        applicant_avatar_url: row.applicants?.avatar_url || null,
+        status: row.status,
+        applied_at: row.applied_at,
+      })) as RecentApplication[];
     },
   });
 

@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { EmptyState } from '@/components/common/EmptyState';
-import {ApplicantCard} from '@/components/applicants/ApplicantCard';
+import { ApplicantCard } from '@/components/applicants/ApplicantCard';
 import { ApplicantDetailModal } from '@/components/applicants/ApplicantDetailModal';
 import { Users, Search, LayoutGrid, List, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils';
 
 interface ApplicantWithStats {
   id: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   phone: string | null;
   gender: string | null;
@@ -42,16 +43,26 @@ export default function Applicants() {
   const { data: applicants, isLoading } = useQuery({
     queryKey: ['applicants', search, genderFilter, wilayaFilter],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('search_applicants_filtered', {
-        search_term: search || null,
-        filter_gender: genderFilter === 'all' ? null : genderFilter,
-        filter_wilaya: wilayaFilter === 'all' ? null : wilayaFilter,
-        min_age: null,
-        max_age: null,
-        min_rating: null,
-      });
+      let query = supabase
+        .from('applicants')
+        .select('id, first_name, last_name, email, phone, gender, wilaya, age, avatar_url, rating, skills, applications(count)')
+        .order('created_at', { ascending: false });
+
+      const term = search.trim();
+      if (term) {
+        query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`);
+      }
+
+      if (genderFilter !== 'all') query = query.eq('gender', genderFilter);
+      if (wilayaFilter !== 'all') query = query.eq('wilaya', wilayaFilter);
+
+      const { data, error } = await query;
       if (error) throw error;
-      return data as ApplicantWithStats[];
+
+      return (data || []).map((row: any) => ({
+        ...row,
+        total_applications: row.applications?.[0]?.count ?? 0,
+      })) as ApplicantWithStats[];
     },
   });
 

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Star, Mail, Phone, MapPin, GraduationCap, Briefcase, FileText, Check, X, Minus } from 'lucide-react';
 import { getRandomAvatar } from '@/components/applicants/ApplicantCard';
-import { cn } from '@/lib/utils';
+import { cn, getPersonDisplayName, getPersonInitials } from '@/lib/utils';
 
 interface Application {
   id: string;
@@ -16,7 +16,8 @@ interface Application {
   job: { id: string; title: string; location: string } | null;
   applicant: {
     id: string;
-    full_name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     phone: string | null;
     gender: string | null;
@@ -136,10 +137,10 @@ export function ApplicantCompareModal({
                         src={app.applicant?.avatar_url || getRandomAvatar(app.applicant?.gender || null, app.applicant?.id || '')} 
                       />
                       <AvatarFallback className="bg-primary/20 text-lg font-bold">
-                        {app.applicant?.full_name?.slice(0, 2).toUpperCase()}
+                        {getPersonInitials(app.applicant)}
                       </AvatarFallback>
                     </Avatar>
-                    <h3 className="font-semibold text-foreground">{app.applicant?.full_name}</h3>
+                    <h3 className="font-semibold text-foreground">{getPersonDisplayName(app.applicant)}</h3>
                     <p className="text-xs text-muted-foreground mt-1">{app.job?.title}</p>
                     <Badge 
                       variant="outline" 
