@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/select';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ApplicantCard } from '@/components/applicants/ApplicantCard';
-import { ApplicantDetailModal } from '@/components/applicants/ApplicantDetailModal';
 import { Users, Search, LayoutGrid, List, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -36,7 +35,6 @@ export default function Applicants() {
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [wilayaFilter, setWilayaFilter] = useState<string>('all');
-  const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const queryClient = useQueryClient();
 
@@ -77,38 +75,11 @@ export default function Applicants() {
     },
   });
 
-  const { data: applicantDetails, isLoading: detailsLoading } = useQuery({
-    queryKey: ['applicant-details', selectedApplicantId],
-    queryFn: async () => {
-      if (!selectedApplicantId) return null;
-      const { data, error } = await supabase
-        .from('applicants')
-        .select('*')
-        .eq('id', selectedApplicantId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedApplicantId,
-  });
-
-  // Get CV URL for selected applicant from their most recent application
-  const { data: applicantCV } = useQuery({
-    queryKey: ['applicant-cv', selectedApplicantId],
-    queryFn: async () => {
-      if (!selectedApplicantId) return null;
-      const { data, error } = await supabase
-        .from('applications')
-        .select('cv_url')
-        .eq('applicant_id', selectedApplicantId)
-        .order('applied_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.cv_url;
-    },
-    enabled: !!selectedApplicantId,
-  });
+  // Get CV URL for applicant
+  const getCVUrl = (applicantId: string) => {
+    // This will be fetched per card if needed
+    return null;
+  };
 
   const updateRatingMutation = useMutation({
     mutationFn: async ({ id, rating }: { id: string; rating: number }) => {
@@ -120,7 +91,6 @@ export default function Applicants() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applicants'] });
-      queryClient.invalidateQueries({ queryKey: ['applicant-details'] });
       toast.success('Rating updated successfully');
     },
     onError: () => {
@@ -297,26 +267,14 @@ export default function Applicants() {
             <ApplicantCard
               key={applicant.id}
               applicant={applicant}
-              onSelect={() => setSelectedApplicantId(applicant.id)}
+              onSelect={() => {
+                // This now does nothing - the card handles navigation internally
+              }}
               onRatingChange={(rating) => handleRatingChange(applicant.id, rating)}
             />
           ))}
         </div>
       )}
-
-      {/* Detail Modal */}
-      <ApplicantDetailModal
-        applicant={applicantDetails}
-        open={!!selectedApplicantId}
-        onClose={() => setSelectedApplicantId(null)}
-        isLoading={detailsLoading}
-        onRatingChange={(rating) => {
-          if (selectedApplicantId) {
-            handleRatingChange(selectedApplicantId, rating);
-          }
-        }}
-        cvUrl={applicantCV}
-      />
     </div>
   );
 }

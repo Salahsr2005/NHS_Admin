@@ -27,7 +27,7 @@ interface ApplicantCardProps {
     skills: any
     total_applications: number
   }
-  onSelect: () => void
+  onSelect?: () => void
   onRatingChange?: (rating: number) => void
   cvUrl?: string | null
 }
@@ -74,6 +74,11 @@ export function ApplicantCard({ applicant, onSelect, onRatingChange, cvUrl }: Ap
     }
   }
 
+  const handleCardClick = () => {
+    // Navigate to profile page instead of opening modal
+    navigate(`/applicants/${applicant.id}`)
+  }
+
   return (
     <Card
       className={cn(
@@ -84,7 +89,7 @@ export function ApplicantCard({ applicant, onSelect, onRatingChange, cvUrl }: Ap
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={onSelect}
+      onClick={handleCardClick}
     >
       {/* Gradient overlay on hover */}
       <div
