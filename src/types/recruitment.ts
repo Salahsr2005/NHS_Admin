@@ -1,4 +1,4 @@
-export type RecruitmentStage = "applied" | "screening" | "interview" | "offer" | "decision"
+export type RecruitmentStage = "applied" | "test_stage" | "interview" | "offer" | "decision"
 export type OfferStatus = "pending" | "accepted" | "declined" | "negotiating"
 export type FinalDecision = "hired" | "rejected"
 
@@ -19,7 +19,7 @@ export interface ApplicationWithRecruitment {
   cv_url?: string | null
   cover_letter?: string | null
   hr_notes?: string | null
-  screening_notes?: string | null
+  test_stage_notes?: string | null
   interview_date?: string | null
   interview_notes?: string | null
   technical_score?: number | null
@@ -34,8 +34,7 @@ export interface ApplicationWithRecruitment {
   }
   applicant?: {
     id: string
-    first_name: string
-    last_name: string
+    full_name: string
     email: string
     phone?: string
     gender?: string
@@ -46,12 +45,15 @@ export interface ApplicationWithRecruitment {
     skills?: any
     education?: any[]
     experience?: any[]
+    address?: string
+    created_at?: string
+    updated_at?: string
   }
 }
 
 export const RECRUITMENT_STAGES: { key: RecruitmentStage; label: string; description: string }[] = [
   { key: "applied", label: "Applied", description: "Initial application received" },
-  { key: "screening", label: "Screening", description: "HR screening and review" },
+  { key: "test_stage", label: "Test Stage", description: "Technical assessment and evaluation" },
   { key: "interview", label: "Interview", description: "Interview scheduling and feedback" },
   { key: "offer", label: "Offer", description: "Salary negotiation and offer" },
   { key: "decision", label: "Decision", description: "Final hiring decision" },
@@ -61,10 +63,8 @@ export function statusToStage(status: string): RecruitmentStage {
   switch (status) {
     case "pending":
       return "applied"
-    case "screening":
-      return "screening"
     case "reviewing":
-      return "interview"
+      return "test_stage"
     case "shortlisted":
       return "offer"
     case "accepted":
@@ -79,8 +79,8 @@ export function stageToStatus(stage: RecruitmentStage): string {
   switch (stage) {
     case "applied":
       return "pending"
-    case "screening":
-      return "screening"
+    case "test_stage":
+      return "reviewing"
     case "interview":
       return "reviewing"
     case "offer":

@@ -29,8 +29,7 @@ export interface JobWithStats extends Job {
 
 export interface Applicant {
   id: string
-  first_name: string
-  last_name: string
+  full_name: string
   email: string
   phone: string | null
   address: string | null
@@ -68,7 +67,7 @@ export interface Application {
   applied_at: string
   updated_at: string
   hr_notes?: string | null
-  screening_notes?: string | null
+  test_stage_notes?: string | null
   interview_date?: string | null
   interview_notes?: string | null
   technical_score?: number | null

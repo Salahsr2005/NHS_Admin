@@ -101,7 +101,7 @@ export default function Applications() {
           status,
           interview_date,
           job:jobs(id, title, location),
-          applicant:applicants(id, first_name, last_name, email, avatar_url, gender)
+          applicant:applicants(id, full_name, email, avatar_url, gender)
         `)
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: true })
@@ -408,6 +408,7 @@ export default function Applications() {
                     src={
                       selectedApplication.applicant?.avatar_url ||
                       getRandomAvatar(selectedApplication.applicant?.gender, selectedApplication.applicant?.id) ||
+                      "/placeholder.svg" ||
                       "/placeholder.svg"
                     }
                   />
@@ -417,7 +418,7 @@ export default function Applications() {
                 </Avatar>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-foreground">
-                    {getPersonDisplayName(selectedApplication.applicant)}
+                    {selectedApplication.applicant?.full_name || getPersonDisplayName(selectedApplication.applicant)}
                   </h3>
                   <p className="text-sm text-muted-foreground">Applied for {selectedApplication.job?.title}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
