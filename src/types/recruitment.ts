@@ -19,7 +19,6 @@ export interface ApplicationWithRecruitment {
   cv_url?: string | null
   cover_letter?: string | null
   hr_notes?: string | null
-  test_stage_notes?: string | null
   interview_date?: string | null
   interview_notes?: string | null
   technical_score?: number | null

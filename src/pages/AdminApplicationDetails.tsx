@@ -59,7 +59,6 @@ export default function AdminApplicationDetails() {
           cv_url,
           cover_letter,
           hr_notes,
-          test_stage_notes,
           interview_date,
           interview_notes,
           technical_score,
@@ -89,7 +88,6 @@ export default function AdminApplicationDetails() {
       const dbStage = statusToStage(application.status)
       setActiveStage(dbStage)
       setHrNotes(application.hr_notes || "")
-      setTestStageNotes(application.test_stage_notes || "")
       setInterviewDate(application.interview_date ? new Date(application.interview_date) : undefined)
       setInterviewNotes(application.interview_notes || "")
       setTechnicalScore(application.technical_score || 5)
@@ -122,9 +120,6 @@ export default function AdminApplicationDetails() {
     switch (stage) {
       case "applied":
         updates.hr_notes = notes
-        break
-      case "test_stage":
-        updates.test_stage_notes = notes
         break
       case "interview":
         updates.interview_notes = notes
