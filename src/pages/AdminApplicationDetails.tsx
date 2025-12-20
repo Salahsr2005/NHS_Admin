@@ -35,7 +35,7 @@ export default function AdminApplicationDetails() {
 
   const [activeStage, setActiveStage] = useState<RecruitmentStage>("pending")
   const [hrNotes, setHrNotes] = useState("")
-  const [screeningNotes, setScreeningNotes] = useState("")
+  const [testStageNotes, setTestStageNotes] = useState("")
   const [interviewDate, setInterviewDate] = useState<Date | undefined>()
   const [interviewNotes, setInterviewNotes] = useState("")
   const [technicalScore, setTechnicalScore] = useState(5)
@@ -58,7 +58,7 @@ export default function AdminApplicationDetails() {
           cv_url,
           cover_letter,
           hr_notes,
-          screening_notes,
+          test_stage_notes,
           interview_date,
           interview_notes,
           technical_score,
@@ -88,7 +88,7 @@ export default function AdminApplicationDetails() {
       const dbStage = statusToStage(application.status)
       setActiveStage(dbStage)
       setHrNotes(application.hr_notes || "")
-      setScreeningNotes(application.screening_notes || "")
+      setTestStageNotes(application.test_stage_notes || "")
       setInterviewDate(application.interview_date ? new Date(application.interview_date) : undefined)
       setInterviewNotes(application.interview_notes || "")
       setTechnicalScore(application.technical_score || 5)
@@ -122,8 +122,8 @@ export default function AdminApplicationDetails() {
       case "applied":
         updates.hr_notes = notes
         break
-      case "screening":
-        updates.screening_notes = notes
+      case "test_stage":
+        updates.test_stage_notes = notes
         break
       case "interview":
         updates.interview_notes = notes
@@ -148,7 +148,7 @@ export default function AdminApplicationDetails() {
   }
 
   const handleReject = (stage: RecruitmentStage) => {
-    saveStageNotes(stage, stage === "screening" ? screeningNotes : stage === "interview" ? interviewNotes : finalNotes)
+    saveStageNotes(stage, stage === "test_stage" ? testStageNotes : stage === "interview" ? interviewNotes : finalNotes)
     updateMutation.mutate({
       status: "rejected",
     })
@@ -337,21 +337,21 @@ export default function AdminApplicationDetails() {
                   onSave={() => saveStageNotes("applied", hrNotes)}
                   onAdvance={() => {
                     saveStageNotes("applied", hrNotes)
-                    advanceToStage("screening")
+                    advanceToStage("test_stage")
                   }}
                   isSaving={updateMutation.isPending}
                 />
               )}
 
-              {activeStage === "screening" && (
+              {activeStage === "test_stage" && (
                 <StageScreening
-                  screeningNotes={screeningNotes}
-                  onScreeningNotesChange={setScreeningNotes}
+                  screeningNotes={testStageNotes}
+                  onScreeningNotesChange={setTestStageNotes}
                   onPassToInterview={() => {
-                    saveStageNotes("screening", screeningNotes)
+                    saveStageNotes("test_stage", testStageNotes)
                     advanceToStage("interview")
                   }}
-                  onReject={() => handleReject("screening")}
+                  onReject={() => handleReject("test_stage")}
                   isSaving={updateMutation.isPending}
                 />
               )}

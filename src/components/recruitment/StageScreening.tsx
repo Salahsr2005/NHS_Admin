@@ -1,30 +1,32 @@
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, X } from 'lucide-react';
+"use client"
+
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { ArrowRight, X } from "lucide-react"
 
 interface StageScreeningProps {
-  screeningNotes: string;
-  onScreeningNotesChange: (notes: string) => void;
-  onPassToInterview: () => void;
-  onReject: () => void;
-  isSaving: boolean;
+  screeningNotes: string
+  onScreeningNotesChange: (notes: string) => void
+  onPassToInterview: () => void
+  onReject: () => void
+  isSaving: boolean
 }
 
-export function StageScreening({ 
-  screeningNotes, 
-  onScreeningNotesChange, 
-  onPassToInterview, 
+export function StageScreening({
+  screeningNotes,
+  onScreeningNotesChange,
+  onPassToInterview,
   onReject,
-  isSaving 
+  isSaving,
 }: StageScreeningProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="screening-notes">Screening Notes</Label>
+        <Label htmlFor="test-stage-notes">Test Stage Notes</Label>
         <Textarea
-          id="screening-notes"
-          placeholder="Document your screening observations, qualifications review, and initial impressions..."
+          id="test-stage-notes"
+          placeholder="Document technical assessment results, test scores, and evaluation observations..."
           value={screeningNotes}
           onChange={(e) => onScreeningNotesChange(e.target.value)}
           className="min-h-[150px] resize-none"
@@ -32,24 +34,19 @@ export function StageScreening({
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 pt-4">
-        <Button 
-          onClick={onPassToInterview} 
+        <Button
+          onClick={onPassToInterview}
           className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700"
           disabled={isSaving}
         >
           Pass to Interview
           <ArrowRight className="h-4 w-4" />
         </Button>
-        <Button 
-          onClick={onReject} 
-          variant="destructive"
-          className="flex-1 gap-2"
-          disabled={isSaving}
-        >
+        <Button onClick={onReject} variant="destructive" className="flex-1 gap-2" disabled={isSaving}>
           <X className="h-4 w-4" />
           Reject Application
         </Button>
       </div>
     </div>
-  );
+  )
 }
