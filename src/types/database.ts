@@ -67,6 +67,7 @@ export interface Application {
   applied_at: string
   updated_at: string
   hr_notes?: string | null
+  screening_notes?: string | null
   interview_date?: string | null
   interview_notes?: string | null
   technical_score?: number | null

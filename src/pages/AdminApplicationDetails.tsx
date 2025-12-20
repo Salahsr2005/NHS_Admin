@@ -34,7 +34,7 @@ export default function AdminApplicationDetails() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
-  const [activeStage, setActiveStage] = useState<RecruitmentStage>("pending")
+  const [activeStage, setActiveStage] = useState<RecruitmentStage>("applied")
   const [hrNotes, setHrNotes] = useState("")
   const [testStageNotes, setTestStageNotes] = useState("")
   const [interviewDate, setInterviewDate] = useState<Date | undefined>()
@@ -59,6 +59,7 @@ export default function AdminApplicationDetails() {
           cv_url,
           cover_letter,
           hr_notes,
+          screening_notes,
           interview_date,
           interview_notes,
           technical_score,
@@ -88,6 +89,7 @@ export default function AdminApplicationDetails() {
       const dbStage = statusToStage(application.status)
       setActiveStage(dbStage)
       setHrNotes(application.hr_notes || "")
+      setTestStageNotes(application.screening_notes || "")
       setInterviewDate(application.interview_date ? new Date(application.interview_date) : undefined)
       setInterviewNotes(application.interview_notes || "")
       setTechnicalScore(application.technical_score || 5)
@@ -120,6 +122,9 @@ export default function AdminApplicationDetails() {
     switch (stage) {
       case "applied":
         updates.hr_notes = notes
+        break
+      case "test_stage":
+        updates.screening_notes = notes
         break
       case "interview":
         updates.interview_notes = notes
