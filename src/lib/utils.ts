@@ -12,15 +12,15 @@ type PersonName = {
 }
 
 export function getPersonDisplayName(person?: PersonName | null): string {
-  // Prioritize full_name since that's what the database uses
-  const full = (person?.full_name || "").trim()
-  if (full) return full
-
-  // Fallback to first_name + last_name for backwards compatibility
+  // First priority: first_name + last_name (actual database fields)
   const first = (person?.first_name || "").trim()
   const last = (person?.last_name || "").trim()
   const combined = `${first} ${last}`.trim()
   if (combined) return combined
+
+  // Fallback to full_name for backwards compatibility (from queries that concat them)
+  const full = (person?.full_name || "").trim()
+  if (full) return full
 
   return "Unknown"
 }

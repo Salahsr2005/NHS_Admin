@@ -1,6 +1,7 @@
 export type JobStatus = "open" | "closed" | "on_hold"
 export type JobType = "full_time" | "part_time" | "contract" | "internship" | "remote"
-export type ApplicationStatus = "pending" | "reviewing" | "shortlisted" | "rejected" | "accepted"
+// Added "offered" to the status list
+export type ApplicationStatus = "pending" | "reviewing" | "shortlisted" | "offered" | "rejected" | "accepted"
 
 export interface Job {
   id: string
@@ -29,7 +30,8 @@ export interface JobWithStats extends Job {
 
 export interface Applicant {
   id: string
-  full_name: string
+  first_name: string
+  last_name: string
   email: string
   phone: string | null
   address: string | null
@@ -39,22 +41,11 @@ export interface Applicant {
   avatar_url: string | null
   rating: number | null
   skills: string[] | null
-  education: EducationItem[] | null
-  experience: ExperienceItem[] | null
+  education: any[] | null
+  experience: any[] | null
+  cv_url: string | null
   created_at: string
   updated_at: string
-}
-
-export interface EducationItem {
-  degree: string
-  school: string
-  year: string
-}
-
-export interface ExperienceItem {
-  title: string
-  company: string
-  duration: string
 }
 
 export interface Application {
@@ -77,50 +68,4 @@ export interface Application {
   stage_history?: any | null
   job?: Job
   applicant?: Applicant
-}
-
-export interface Profile {
-  id: string
-  user_id: string
-  full_name: string | null
-  avatar_url: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface DashboardStats {
-  total_jobs: number
-  open_jobs: number
-  closed_jobs: number
-  total_applicants: number
-  total_applications: number
-  pending_applications: number
-  reviewing_applications: number
-  shortlisted_applications: number
-  accepted_applications: number
-  rejected_applications: number
-  applications_today: number
-  applications_this_week: number
-  applications_this_month: number
-}
-
-export interface RecentApplication {
-  application_id: string
-  job_id: string
-  job_title: string
-  applicant_id: string
-  applicant_name: string
-  applicant_email: string
-  applicant_avatar_url: string | null
-  status: string
-  applied_at: string
-}
-
-export interface JobDemographics {
-  total_applicants: number
-  male_count: number
-  female_count: number
-  avg_age: number | null
-  top_wilaya: string | null
-  wilaya_distribution: { wilaya: string; count: number }[] | null
 }

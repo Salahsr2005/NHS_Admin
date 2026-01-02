@@ -8,10 +8,27 @@ interface RecruitmentTimelineProps {
   currentStage: RecruitmentStage
   activeStage: RecruitmentStage
   onStageClick: (stage: RecruitmentStage) => void
+  isFinalDecisionMade?: boolean
 }
 
-export function RecruitmentTimeline({ currentStage, activeStage, onStageClick }: RecruitmentTimelineProps) {
+export function RecruitmentTimeline({
+  currentStage,
+  activeStage,
+  onStageClick,
+  isFinalDecisionMade,
+}: RecruitmentTimelineProps) {
   const currentIndex = RECRUITMENT_STAGES.findIndex((s) => s.key === currentStage)
+
+  const isStageComplete = (index: number): boolean => {
+    if (index < currentIndex) return true
+    if (index === currentIndex && isFinalDecisionMade) return true
+    return false
+  }
+
+  // Only allow clicking on stages that have been reached (completed or current)
+  const canClickStage = (index: number) => {
+    return index <= currentIndex
+  }
 
   return (
     <div className="w-full">
@@ -20,15 +37,15 @@ export function RecruitmentTimeline({ currentStage, activeStage, onStageClick }:
         {/* Progress line */}
         <div className="absolute left-0 right-0 top-5 h-0.5 bg-border" />
         <div
-          className="absolute left-0 top-5 h-0.5 bg-primary transition-all duration-500 ease-out"
-          style={{ width: currentIndex >= 0 ? `${(currentIndex / (RECRUITMENT_STAGES.length - 1)) * 100}%` : "0%" }}
+          className="absolute left-0 top-5 h-0.5 bg-primary transition-all duration-300"
+          style={{ width: `${(currentIndex / (RECRUITMENT_STAGES.length - 1)) * 100}%` }}
         />
 
         {RECRUITMENT_STAGES.map((stage, index) => {
-          const isCompleted = index < currentIndex
-          const isCurrent = index === currentIndex
+          const isCompleted = isStageComplete(index)
+          const isCurrent = index === currentIndex && !isFinalDecisionMade
           const isActive = stage.key === activeStage
-          const isClickable = index <= currentIndex
+          const isClickable = canClickStage(index)
 
           return (
             <button
@@ -36,16 +53,17 @@ export function RecruitmentTimeline({ currentStage, activeStage, onStageClick }:
               onClick={() => isClickable && onStageClick(stage.key)}
               disabled={!isClickable}
               className={cn(
-                "relative z-10 flex flex-col items-center gap-2 transition-all",
-                isClickable && "hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-lg p-2",
-                !isClickable && "opacity-50 cursor-not-allowed",
+                "relative z-10 flex flex-col items-center gap-2 transition-all rounded-lg p-2",
+                isClickable
+                  ? "hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+                  : "cursor-not-allowed opacity-50",
               )}
             >
               <div
                 className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 border-2",
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all border-2",
                   isCompleted && "bg-primary border-primary text-primary-foreground",
-                  isCurrent && "bg-primary/20 border-primary text-primary scale-110",
+                  isCurrent && "bg-primary/20 border-primary text-primary",
                   !isCompleted && !isCurrent && "bg-background border-border text-muted-foreground",
                   isActive && "ring-4 ring-primary/30",
                 )}
@@ -68,10 +86,10 @@ export function RecruitmentTimeline({ currentStage, activeStage, onStageClick }:
       {/* Mobile vertical timeline */}
       <div className="md:hidden space-y-2">
         {RECRUITMENT_STAGES.map((stage, index) => {
-          const isCompleted = index < currentIndex
-          const isCurrent = index === currentIndex
+          const isCompleted = isStageComplete(index)
+          const isCurrent = index === currentIndex && !isFinalDecisionMade
           const isActive = stage.key === activeStage
-          const isClickable = index <= currentIndex
+          const isClickable = canClickStage(index)
 
           return (
             <button
@@ -80,14 +98,15 @@ export function RecruitmentTimeline({ currentStage, activeStage, onStageClick }:
               disabled={!isClickable}
               className={cn(
                 "w-full flex items-center gap-3 p-3 rounded-lg transition-all",
-                isClickable && "hover:bg-secondary/50 focus:outline-none focus:ring-2 focus:ring-primary/50",
-                !isClickable && "opacity-50 cursor-not-allowed",
+                isClickable
+                  ? "hover:bg-secondary/50 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+                  : "cursor-not-allowed opacity-50",
                 isActive && "bg-primary/10 border border-primary/30",
               )}
             >
               <div
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all duration-300",
+                  "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2",
                   isCompleted && "bg-primary border-primary text-primary-foreground",
                   isCurrent && "bg-primary/20 border-primary text-primary",
                   !isCompleted && !isCurrent && "bg-background border-border text-muted-foreground",

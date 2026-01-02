@@ -18,13 +18,13 @@ import { StageScreening } from "@/components/recruitment/StageScreening"
 import { StageInterview } from "@/components/recruitment/StageInterview"
 import { StageOffer } from "@/components/recruitment/StageOffer"
 import { StageDecision } from "@/components/recruitment/StageDecision"
-import {
-  type RecruitmentStage,
-  type OfferStatus,
-  type ApplicationWithRecruitment,
-  statusToStage,
-  stageToStatus,
+import { 
+  type RecruitmentStage, 
+  type OfferStatus, 
+  statusToStage, 
+  stageToStatus 
 } from "@/types/recruitment"
+import type { Application, ApplicationStatus } from "@/types/database"
 import { ArrowLeft, Mail, Phone, MapPin, Briefcase, GraduationCap, FileText, ExternalLink, User } from "lucide-react"
 import { getPersonDisplayName } from "@/lib/utils"
 
@@ -50,36 +50,24 @@ export default function AdminApplicationDetails() {
       const { data, error } = await supabase
         .from("applications")
         .select(`
-          id,
-          applicant_id,
-          job_id,
-          status,
-          applied_at,
-          updated_at,
-          cv_url,
-          cover_letter,
-          hr_notes,
-          screening_notes,
-          interview_date,
-          interview_notes,
-          technical_score,
-          proposed_salary,
-          offer_status,
-          final_notes,
-          jobs (id, title, location),
-          applicants (*)
+          *,
+          job:jobs!inner(id, title, location),
+          applicant:applicants!inner(
+            id, first_name, last_name, email, phone, gender, wilaya, age, 
+            avatar_url, rating, skills, education, experience, address, 
+            cv_url, created_at, updated_at
+          )
         `)
         .eq("id", id)
-        .maybeSingle()
+        .single()
 
-      if (error) throw error
-      if (!data) throw new Error("Application not found")
+      if (error) {
+        console.error("Error fetching application:", error)
+        throw error
+      }
 
-      return {
-        ...data,
-        job: data.jobs,
-        applicant: data.applicants,
-      } as unknown as ApplicationWithRecruitment
+      // Cast the response to Application type
+      return data as unknown as Application
     },
     enabled: !!id,
   })
@@ -100,24 +88,29 @@ export default function AdminApplicationDetails() {
   }, [application])
 
   const updateMutation = useMutation({
-    mutationFn: async (updates: Record<string, any>) => {
-      const { error } = await supabase.from("applications").update(updates).eq("id", id)
+    mutationFn: async (updates: Partial<Application>) => {
+      const { error } = await supabase
+        .from("applications")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", id)
 
-      if (error) throw error
+      if (error) {
+        throw error
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["application-detail", id] })
       queryClient.invalidateQueries({ queryKey: ["applications"] })
-      queryClient.invalidateQueries({ queryKey: ["interview-schedule"] })
       toast({ title: "Success", description: "Application updated successfully." })
     },
     onError: (error) => {
+      console.error("Mutation error:", error)
       toast({ title: "Error", description: error.message, variant: "destructive" })
     },
   })
 
   const saveStageNotes = (stage: RecruitmentStage, notes: string) => {
-    const updates: Record<string, any> = {}
+    const updates: Partial<Application> = {}
 
     switch (stage) {
       case "applied":
@@ -139,9 +132,11 @@ export default function AdminApplicationDetails() {
     }
   }
 
-  const advanceToStage = (nextStage: RecruitmentStage, additionalUpdates: Record<string, any> = {}) => {
-    const updates: Record<string, any> = {
-      status: stageToStatus(nextStage),
+  const advanceToStage = (nextStage: RecruitmentStage, additionalUpdates: Partial<Application> = {}) => {
+    const status = stageToStatus(nextStage) as ApplicationStatus
+    
+    const updates: Partial<Application> = {
+      status,
       ...additionalUpdates,
     }
 
@@ -149,17 +144,14 @@ export default function AdminApplicationDetails() {
   }
 
   const handleReject = (stage: RecruitmentStage) => {
+    // Save notes before rejecting
     saveStageNotes(stage, stage === "test_stage" ? testStageNotes : stage === "interview" ? interviewNotes : finalNotes)
-    updateMutation.mutate({
-      status: "rejected",
-    })
+    updateMutation.mutate({ status: "rejected" })
   }
 
   const handleHire = () => {
     saveStageNotes("decision", finalNotes)
-    updateMutation.mutate({
-      status: "accepted",
-    })
+    updateMutation.mutate({ status: "accepted" })
   }
 
   const parseEducation = (education: any): string => {
@@ -193,11 +185,11 @@ export default function AdminApplicationDetails() {
   }
 
   const applicant = application.applicant
-  const avatarUrl = applicant?.avatar_url || getRandomAvatar(applicant?.gender, applicant?.id)
+  // Use a type guard or fallback for avatar
+  const avatarUrl = applicant?.avatar_url || (applicant ? getRandomAvatar(applicant.gender || "male", applicant.id) : "")
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate("/applications")}>
           <ArrowLeft className="h-5 w-5" />
@@ -211,21 +203,20 @@ export default function AdminApplicationDetails() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Applicant Profile */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16 ring-2 ring-primary/20">
-                <AvatarImage src={avatarUrl || "/placeholder.svg"} className="object-cover" />
-                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-secondary text-lg font-medium">
+                <AvatarImage src={avatarUrl} className="object-cover" />
+                <AvatarFallback>
                   {applicant?.first_name?.slice(0, 1).toUpperCase()}
                   {applicant?.last_name?.slice(0, 1).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <CardTitle className="text-lg">{getPersonDisplayName(applicant)}</CardTitle>
-                <Badge variant="outline" className="mt-1">
-                  {application.status}
+                <CardTitle className="text-lg">{applicant ? getPersonDisplayName(applicant) : "Unknown Applicant"}</CardTitle>
+                <Badge variant="outline" className="mt-1 capitalize">
+                  {application.status.replace("_", " ")}
                 </Badge>
               </div>
             </div>
@@ -234,7 +225,6 @@ export default function AdminApplicationDetails() {
           <CardContent className="space-y-4">
             <Separator />
 
-            {/* Contact Info */}
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="h-4 w-4 text-muted-foreground" />
@@ -265,7 +255,6 @@ export default function AdminApplicationDetails() {
 
             <Separator />
 
-            {/* Education */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <GraduationCap className="h-4 w-4 text-primary" />
@@ -274,7 +263,6 @@ export default function AdminApplicationDetails() {
               <p className="text-sm text-muted-foreground">{parseEducation(applicant?.education)}</p>
             </div>
 
-            {/* Experience */}
             {applicant?.experience && Array.isArray(applicant.experience) && applicant.experience.length > 0 && (
               <>
                 <Separator />
@@ -297,7 +285,6 @@ export default function AdminApplicationDetails() {
               </>
             )}
 
-            {/* CV Link */}
             {application.cv_url && (
               <>
                 <Separator />
@@ -315,18 +302,15 @@ export default function AdminApplicationDetails() {
           </CardContent>
         </Card>
 
-        {/* Right Column - Recruitment Timeline & Actions */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Recruitment Timeline</CardTitle>
           </CardHeader>
           <CardContent className="space-y-8">
-            {/* Timeline Stepper */}
             <RecruitmentTimeline currentStage={currentStage} activeStage={activeStage} onStageClick={setActiveStage} />
 
             <Separator />
 
-            {/* Stage Content */}
             <div className="min-h-[300px]">
               {activeStage === "applied" && (
                 <StageApplied

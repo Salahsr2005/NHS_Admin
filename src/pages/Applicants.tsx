@@ -14,7 +14,8 @@ import { cn } from "@/lib/utils"
 
 interface ApplicantWithStats {
   id: string
-  full_name: string
+  first_name: string
+  last_name: string
   email: string
   phone: string | null
   gender: string | null
@@ -38,12 +39,14 @@ export default function Applicants() {
     queryFn: async () => {
       let query = supabase
         .from("applicants")
-        .select("id, full_name, email, phone, gender, wilaya, age, avatar_url, rating, skills, applications(count)")
+        .select(
+          "id, first_name, last_name, email, phone, gender, wilaya, age, avatar_url, rating, skills, applications(count)",
+        )
         .order("created_at", { ascending: false })
 
       const term = search.trim()
       if (term) {
-        query = query.or(`full_name.ilike.%${term}%,email.ilike.%${term}%`)
+        query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`)
       }
 
       if (genderFilter !== "all") query = query.eq("gender", genderFilter)

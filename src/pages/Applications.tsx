@@ -73,12 +73,17 @@ export default function Applications() {
         .from("applications")
         .select(`
           *,
-          job:jobs(id, title, location),
-          applicant:applicants(*)
+          job:jobs!inner(id, title, location),
+          applicant:applicants!inner(id, first_name, last_name, email, phone, gender, wilaya, age, avatar_url, rating, skills, education, experience, address)
         `)
         .order("applied_at", { ascending: false })
-      if (error) throw error
-      return data
+
+      if (error) {
+        console.error("[v0] Error fetching applications:", error)
+        throw error
+      }
+
+      return data || []
     },
   })
 
@@ -97,28 +102,26 @@ export default function Applications() {
       const { data, error } = await supabase
         .from("applications")
         .select(`
-          id,
-          status,
-          interview_date,
-          job:jobs(id, title, location),
-          applicant:applicants(id, full_name, email, avatar_url, gender)
+          *,
+          job:jobs!inner(id, title, location),
+          applicant:applicants!inner(id, first_name, last_name, email, avatar_url, gender)
         `)
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: true })
 
       if (error) throw error
-      return data
+      return data || []
     },
   })
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: ApplicationStatus }) => {
-      const { data, error } = await supabase.rpc("update_application_status", {
-        application_id_param: id,
-        new_status: status,
-      })
+      const { error } = await supabase
+        .from("applications")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", id)
+
       if (error) throw error
-      return data
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["applications"] })
@@ -134,7 +137,6 @@ export default function Applications() {
     },
   })
 
-  // Get unique wilayas for filter
   const wilayas = useMemo(() => {
     if (!applications) return []
     const uniqueWilayas = new Set<string>()
@@ -146,40 +148,27 @@ export default function Applications() {
     return Array.from(uniqueWilayas).sort()
   }, [applications])
 
-  // Filter applications
   const filteredApplications = useMemo(() => {
     if (!applications) return []
 
     return applications.filter((app) => {
-      // Status filter
       if (activeTab !== "all" && app.status !== activeTab) return false
 
-      // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
-        const matchesName = getPersonDisplayName(app.applicant).toLowerCase().includes(searchLower)
+        const fullName = `${app.applicant?.first_name || ""} ${app.applicant?.last_name || ""}`.toLowerCase()
+        const matchesName = fullName.includes(searchLower)
         const matchesEmail = app.applicant?.email?.toLowerCase().includes(searchLower)
         const matchesJob = app.job?.title?.toLowerCase().includes(searchLower)
         if (!matchesName && !matchesEmail && !matchesJob) return false
       }
 
-      // Job filter
       if (filters.jobId && app.job?.id !== filters.jobId) return false
-
-      // Gender filter
       if (filters.gender && app.applicant?.gender !== filters.gender) return false
-
-      // Wilaya filter
       if (filters.wilaya && app.applicant?.wilaya !== filters.wilaya) return false
-
-      // Rating filter
       if (filters.minRating > 0 && (!app.applicant?.rating || app.applicant.rating < filters.minRating)) return false
-
-      // Age filters
       if (filters.minAge && (!app.applicant?.age || app.applicant.age < filters.minAge)) return false
       if (filters.maxAge && (!app.applicant?.age || app.applicant.age > filters.maxAge)) return false
-
-      // Date filters
       if (filters.dateFrom && new Date(app.applied_at) < new Date(filters.dateFrom)) return false
       if (filters.dateTo && new Date(app.applied_at) > new Date(filters.dateTo)) return false
 
@@ -247,7 +236,6 @@ export default function Applications() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Compare Button */}
           {selectedForCompare.length >= 2 && (
             <Button
               onClick={() => setShowCompareModal(true)}
@@ -258,7 +246,6 @@ export default function Applications() {
             </Button>
           )}
 
-          {/* View Mode Toggle */}
           <div className="flex items-center rounded-lg border border-border/50 bg-secondary/30 p-1">
             <Button
               variant="ghost"
@@ -288,10 +275,8 @@ export default function Applications() {
         </div>
       </div>
 
-      {/* Filters */}
       <ApplicationFilters filters={filters} onFiltersChange={setFilters} jobs={jobs || []} wilayas={wilayas} />
 
-      {/* Selection Info */}
       {selectedForCompare.length > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-3">
           <span className="text-sm text-foreground">
@@ -309,7 +294,6 @@ export default function Applications() {
         </div>
       )}
 
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ApplicationStatus | "all")}>
         <TabsList className="w-full justify-start overflow-x-auto bg-secondary/30 p-1">
           {statusTabs.map((tab) => (
@@ -385,7 +369,6 @@ export default function Applications() {
         </TabsContent>
       </Tabs>
 
-      {/* Compare Modal */}
       <ApplicantCompareModal
         open={showCompareModal}
         onClose={() => setShowCompareModal(false)}
@@ -393,7 +376,6 @@ export default function Applications() {
         onRemove={(id) => setSelectedForCompare(selectedForCompare.filter((s) => s !== id))}
       />
 
-      {/* Application Detail Modal */}
       <Dialog open={!!selectedApplication} onOpenChange={() => setSelectedApplication(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -401,14 +383,12 @@ export default function Applications() {
           </DialogHeader>
           {selectedApplication && (
             <div className="space-y-6">
-              {/* Applicant Header */}
               <div className="flex items-start gap-4">
                 <Avatar className="h-16 w-16 ring-2 ring-background shadow-lg">
                   <AvatarImage
                     src={
                       selectedApplication.applicant?.avatar_url ||
                       getRandomAvatar(selectedApplication.applicant?.gender, selectedApplication.applicant?.id) ||
-                      "/placeholder.svg" ||
                       "/placeholder.svg"
                     }
                   />
@@ -418,7 +398,7 @@ export default function Applications() {
                 </Avatar>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-foreground">
-                    {selectedApplication.applicant?.full_name || getPersonDisplayName(selectedApplication.applicant)}
+                    {getPersonDisplayName(selectedApplication.applicant)}
                   </h3>
                   <p className="text-sm text-muted-foreground">Applied for {selectedApplication.job?.title}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -439,7 +419,6 @@ export default function Applications() {
                 </div>
               </div>
 
-              {/* Status Update */}
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium text-foreground">Status:</span>
                 <Select
@@ -459,7 +438,6 @@ export default function Applications() {
                 </Select>
               </div>
 
-              {/* Contact Info */}
               <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-secondary/30 p-4">
                 <div className="flex items-center gap-2 text-sm">
                   <Mail className="h-4 w-4 text-muted-foreground" />
@@ -479,12 +457,14 @@ export default function Applications() {
                 )}
               </div>
 
-              {/* Skills */}
-              {parseSkills(selectedApplication.applicant?.skills).length > 0 && (
+              {selectedApplication.applicant?.skills && (
                 <div>
-                  <h4 className="mb-2 text-sm font-medium text-foreground">Skills</h4>
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-primary" />
+                    Skills
+                  </h4>
                   <div className="flex flex-wrap gap-2">
-                    {parseSkills(selectedApplication.applicant?.skills).map((skill) => (
+                    {parseSkills(selectedApplication.applicant.skills).map((skill) => (
                       <Badge key={skill} variant="secondary">
                         {skill}
                       </Badge>
@@ -493,41 +473,18 @@ export default function Applications() {
                 </div>
               )}
 
-              {/* Education */}
-              {selectedApplication.applicant?.education &&
-                Array.isArray(selectedApplication.applicant.education) &&
-                selectedApplication.applicant.education.length > 0 && (
-                  <div>
-                    <h4 className="mb-2 text-sm font-medium text-foreground flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4" />
-                      Education
-                    </h4>
-                    <div className="space-y-2">
-                      {selectedApplication.applicant.education.map((edu: any, i: number) => (
-                        <div key={i} className="rounded-lg border border-border bg-secondary/30 p-3">
-                          <p className="font-medium text-foreground">{edu.degree}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {edu.school} • {edu.year}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {/* Experience */}
-              {selectedApplication.applicant?.experience?.length > 0 && (
+              {selectedApplication.applicant?.education && Array.isArray(selectedApplication.applicant.education) && (
                 <div>
-                  <h4 className="mb-2 text-sm font-medium text-foreground flex items-center gap-2">
-                    <Briefcase className="h-4 w-4" />
-                    Experience
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-primary" />
+                    Education
                   </h4>
                   <div className="space-y-2">
-                    {selectedApplication.applicant.experience.map((exp: any, i: number) => (
-                      <div key={i} className="rounded-lg border border-border bg-secondary/30 p-3">
-                        <p className="font-medium text-foreground">{exp.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {exp.company} • {exp.duration}
+                    {selectedApplication.applicant.education.map((edu: any, i: number) => (
+                      <div key={i} className="text-sm">
+                        <p className="font-medium">{edu.degree}</p>
+                        <p className="text-muted-foreground">
+                          {edu.school} {edu.year && `• ${edu.year}`}
                         </p>
                       </div>
                     ))}
@@ -535,26 +492,25 @@ export default function Applications() {
                 </div>
               )}
 
-              {/* Cover Letter */}
-              {selectedApplication.cover_letter && (
-                <div>
-                  <h4 className="mb-2 text-sm font-medium text-foreground">Cover Letter</h4>
-                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                    <p className="whitespace-pre-wrap text-sm text-foreground">{selectedApplication.cover_letter}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* CV Download */}
               {selectedApplication.cv_url && (
                 <Button
                   variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={() => window.open(selectedApplication.cv_url, "_blank", "noopener,noreferrer")}
+                  className="w-full gap-2 bg-transparent"
+                  onClick={() => window.open(selectedApplication.cv_url, "_blank")}
                 >
-                  <Download className="mr-2 h-4 w-4" />
+                  <FileText className="h-4 w-4" />
                   View CV
+                  <Download className="h-4 w-4 ml-auto" />
                 </Button>
+              )}
+
+              {selectedApplication.cover_letter && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Cover Letter</h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {selectedApplication.cover_letter}
+                  </p>
+                </div>
               )}
             </div>
           )}
